@@ -1,108 +1,85 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Comp AI</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#07101f;color:#eef5ff;font-family:Arial,sans-serif}
-main{max-width:600px;margin:auto;padding:20px}
-.card{background:#101b30;border:1px solid #20304d;border-radius:16px;padding:20px;margin:15px 0}
-button{width:100%;padding:14px;background:#19d86a;border:0;border-radius:10px;font-weight:bold;cursor:pointer}
-button:disabled{opacity:.4}
-.track{height:10px;background:#192844;border-radius:10px;overflow:hidden;margin-top:10px}
-.fill{height:100%;width:0;background:#21dd70;transition:width .2s}
-.log{background:#050a12;padding:10px;height:120px;overflow:auto;color:#19d7ff;font:12px monospace;margin-top:10px}
-video{width:100%;border-radius:10px;margin-top:10px}
-a{display:inline-block;padding:12px;background:#21dd70;color:#000;text-decoration:none;font-weight:bold;border-radius:8px;margin-top:10px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comp AI</title>
+    <style>
+        body { font-family: sans-serif; background: #0b132b; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; box-sizing: border-box; }
+        .card { background: #1c2541; padding: 25px; border-radius: 12px; max-width: 450px; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        h1 { margin-top: 0; font-size: 24px; }
+        .box { background: #0b132b; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input[type="file"] { margin-top: 5px; width: 100%; color: white; }
+        button { background: #00b4d8; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button:disabled { background: #555; }
+        #log { background: #000; color: #00ffcc; padding: 10px; border-radius: 6px; font-family: monospace; height: 120px; overflow-y: auto; font-size: 12px; margin-top: 15px; white-space: pre-wrap; }
+    </style>
 </head>
 <body>
-<main>
-  <h2>◉ Comp AI</h2>
-  <div class="card">
-    <label>📹 Maç Videosu Seç:</label><br>
-    <input id="match" type="file" accept="video/*"><br><br>
-    <label>🧑 Oyuncu Fotoğrafı Seç:</label><br>
-    <input id="player" type="file" accept="image/*">
-  </div>
 
-  <div class="card">
-    <button id="start" disabled>⚡ COMP'U BAŞLAT</button>
-    <div class="track"><div id="fill" class="fill"></div></div>
-    <p id="status">Hazır</p>
-    <div id="log" class="log">[SYSTEM] Sunucuya bağlanmaya hazır...</div>
-  </div>
+<div class="card">
+    <h1>🎬 Comp AI</h1>
+    <div class="box">
+        <label>🎥 Maç Videosu Seç:</label>
+        <input type="file" id="videoFile" accept="video/*">
+        
+        <label>🧑 Oyuncu Fotoğrafı Seç:</label>
+        <input type="file" id="imageFile" accept="image/*">
+    </div>
 
-  <div id="result" class="card" hidden>
-    <h3>Kırpılmış Video Hazır!</h3>
-    <video id="preview" controls></video><br>
-    <a id="download" download>⬇ İNDİR</a>
-  </div>
-</main>
+    <button id="startBtn" onclick="startProcess()">⚡ COMP'U BAŞLAT</button>
+
+    <div id="log">[SYSTEM] Hazır...</div>
+</div>
 
 <script>
-// Colab'ın verdiği https://xxxx.ngrok-free.app adresini buraya tırnak içine yapıştır
-const SERVER_URL = "[(https://mycompai-app.loca.lt)";
+    // SUNUCU ADRESIN BURAYA GELECEK
+    const SERVER_URL = "https://mycompai-app.loca.lt";
 
-const $ = id => document.getElementById(id);
-let match = null, player = null;
-
-function log(m){ $("log").textContent += "\n" + m; $("log").scrollTop = $("log").scrollHeight; }
-
-$("match").onchange = e => { match = e.target.files[0]; check(); };
-$("player").onchange = e => { player = e.target.files[0]; check(); };
-function check(){ $("start").disabled = !(match && player); }
-
-$("start").onclick = async () => {
-  $("start").disabled = true;
-  $("result").hidden = true;
-  log("[START] Dosyalar yükleniyor...");
-  
-  const fd = new FormData();
-  fd.append("video", match);
-  fd.append("photo", player);
-
-  try {
-    const res = await fetch(`${SERVER_URL}/process`, { method: "POST", body: fd });
-    const data = await res.json();
-    if(data.error) throw new Error(data.error);
-    
-    log(`[SERVER] İşlem Başladı. ID: ${data.job_id}`);
-    trackJob(data.job_id);
-  } catch(err) {
-    log("[ERROR] " + err.message);
-    $("start").disabled = false;
-  }
-};
-
-function trackJob(jobId){
-  const timer = setInterval(async () => {
-    try {
-      const res = await fetch(`${SERVER_URL}/status/${jobId}`);
-      const data = await res.json();
-
-      $("fill").style.width = (data.progress || 0) + "%";
-      $("status").textContent = data.status;
-
-      if(data.done){
-        clearInterval(timer);
-        $("start").disabled = false;
-        if(data.error){
-          log("[ERROR] " + data.error);
-        } else {
-          log("[SUCCESS] Comp Hazır!");
-          $("preview").src = `${SERVER_URL}${data.url}`;
-          $("download").href = `${SERVER_URL}${data.url}`;
-          $("result").hidden = false;
-        }
-      }
-    } catch(e) {
-      clearInterval(timer);
-      $("start").disabled = false;
+    function log(msg) {
+        const l = document.getElementById("log");
+        l.innerText += "\n" + msg;
+        l.scrollTop = l.scrollHeight;
     }
-  }, 2000);
-}
+
+    async function startProcess() {
+        const video = document.getElementById("videoFile").files[0];
+        const image = document.getElementById("imageFile").files[0];
+
+        if (!video || !image) {
+            alert("Lütfen hem video hem fotoğraf seçin!");
+            return;
+        }
+
+        document.getElementById("startBtn").disabled = true;
+        log("[START] Sunucuya bağlanılıyor...");
+
+        try {
+            const formData = new FormData();
+            formData.append("video", video);
+            formData.append("image", image);
+
+            const res = await fetch(`${SERVER_URL}/process`, {
+                method: "POST",
+                headers: {
+                    "Bypass-Tunnel-Reminder": "true",
+                    "ngrok-skip-browser-warning": "true"
+                },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error("Sunucu yanıt vermedi");
+
+            const data = await res.json();
+            log("[OK] İşlem başlatıldı! ID: " + data.job_id);
+
+        } catch (err) {
+            log("[ERROR] " + err.message);
+            document.getElementById("startBtn").disabled = false;
+        }
+    }
 </script>
+
 </body>
 </html>
